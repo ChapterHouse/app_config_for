@@ -1,5 +1,5 @@
-## [Unreleased]
+## [Alpha Release]
 
-## [0.1.0] - 2022-02-18
+## [0.0.1] - 2022-02-18
 
 - Initial release

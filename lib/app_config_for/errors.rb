@@ -22,4 +22,17 @@ module AppConfigFor
       super "Could not load configuration file: #{@file}\n#{@original_exception.message}"
     end
   end
+
+  class InvalidEnvInheritanceStyle < Error
+
+    attr_reader :attempted, :valid
+
+    def initialize(attempted)
+      @attempted = attempted
+      @valid = EnvPrefixInheritanceStyles.dup
+      super "Invalid inheritance style #{@attempted.inspect}. Please use one of the following: #{@valid.map(&:inspect).join(', ')}"
+    end
+
+  end
+
 end

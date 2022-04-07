@@ -12,17 +12,20 @@ require 'active_support/core_ext/object/try'
 
 module AppConfigFor
 
+  EnvPrefixInheritanceStyles = %i(none namespace class namespace_class class_namespace)
+
   def initialize(*args)
     add_env_prefix
     super
   end
 
-  def add_env_prefix(prefix = nil, at_beginning: true)
-    env_prefixes(all: false, dup: false).send(at_beginning ? :unshift : :push, AppConfigFor.prefix_from(prefix || self)).uniq!
+  def add_env_prefix(prefix = nil, at_beginning = true)
+    env_prefixes(false, false).send(at_beginning ? :unshift : :push, AppConfigFor.prefix_from(prefix || self)).uniq!
   end
 
   def config_directories
-    directories = ['Rails'.safe_constantize&.application&.paths, try(:paths)].compact.map { |root| Pathname.new(root["config"].existent.first) }
+    directories = ['Rails'.safe_constantize&.application&.paths, try(:paths)].compact.map { |root| root["config"].existent.first }.compact
+    directories.map! { |directory| Pathname.new(directory) }
     directories.push(Pathname.getwd + 'config')
     directories.uniq
   end
@@ -44,8 +47,8 @@ module AppConfigFor
     !config_file(name).blank?
   end
 
-  def config_for(name, environment: nil)
-    config, shared = config_options(name).fetch_values((environment || env).to_sym, :shared) {nil}
+  def config_for(name, env: nil)
+    config, shared = config_options(name).fetch_values((environment || self.env).to_sym, :shared) {nil}
     config ||= shared
 
     if config.is_a?(Hash)
@@ -65,44 +68,52 @@ module AppConfigFor
     raise LoadError.new(file, exception)
   end
 
-  def configured(environment: nil)
-    config_for(self, environment: environment)
+  def configured(env: nil)
+    config_for(self, env: env)
   end
 
-  def env(reload: false)
+  def env(reload = false)
     @env = ActiveSupport::EnvironmentInquirer.new(AppConfigFor.env_name(env_prefixes)) if reload || @env.nil?
     @env
   end
 
-  def env_prefixes(all: true, dup: true)
+  def env_prefix_inheritance
+    @env_prefix_inheritance ||= :namespace
+  end
+
+  def env_prefix_inheritance=(style)
+    @env_prefix_inheritance = AppConfigFor.verified_style!(style)
+  end
+
+  def env_prefixes(all = true, dup = true)
     @env_prefixes ||= []
     if all
-      @env_prefixes + AppConfigFor.progenitor_of(self).env_prefixes(all: true)
+      @env_prefixes + AppConfigFor.progenitor_prefixes_of(self)
     else
       dup ? @env_prefixes.dup : @env_prefixes
     end
   end
 
-  def remove_env_prefix(prefix, all: false)
+  def remove_env_prefix(prefix, all = false)
     if all
       remove_env_prefix(prefix)
-      AppConfigFor.progenitor_of(self).remove_env_prefix(prefix, all: true)
+      AppConfigFor.progenitor_of(self)&.remove_env_prefix(prefix, all)
     else
-      env_prefixes(all: false, dup: false).delete(AppConfigFor.prefix_from(prefix))
+      env_prefixes(false, false).delete(AppConfigFor.prefix_from(prefix))
     end
   end
 
   class << self
 
-    def add_env_prefix(prefix)
-      env_prefixes(dup: false).push(prefix_from(prefix))
+    def add_env_prefix(prefix, at_beginning = true)
+      env_prefixes(false, false).send(at_beginning ? :unshift : :push, prefix_from(prefix)).uniq!
     end
 
     def env_name(prefixes = env_prefixes)
       prefixes.inject(nil) { |current_env, name| current_env || ENV["#{name.to_s.upcase}_ENV"].presence } || 'development'
     end
 
-    def env_prefixes(all: true, dup: true)
+    def env_prefixes(_all = true, dup = true)
       # all is ignored as we are at the end of the chain
       @env_prefixes ||= [:rails, :rack]
       dup ? @env_prefixes.dup : @env_prefixes
@@ -117,6 +128,27 @@ module AppConfigFor
       else
         object.class.name
       end.deconstantize.safe_constantize
+    end
+
+    # Not used internally, this is a convenience method to study what progenitors are used during namespace dives
+    def namespaces_of(object)
+      (object = [namespace_of(object)]).each { |x| x && object << namespace_of(x) }[0..-2]
+    end
+
+    def parent_of(object)
+      case object
+      when String
+        object.safe_constantize
+      when Class
+        object.superclass
+      else
+        object.class
+      end
+    end
+
+    # Not used internally, this is a convenience method to study what progenitors are used during class dives
+    def parents_of(object)
+      (object = [parent_of(object)]).each { |x| x && object << parent_of(x) }[0..-2]
     end
 
     def prefix_from(object)
@@ -134,19 +166,41 @@ module AppConfigFor
           object.class.name
         end.underscore.gsub('/','_').to_sym
      end
-
     end
 
-    # First namespace of the object that supports env_prefixes or AppConfig
-    def progenitor_of(object)
-      (namespace_of(object) || self).yield_self do |namespace|
-        namespace.respond_to?(:env_prefixes) ? namespace : progenitor_of(namespace)
-      end
+    def progenitor_of(object, style = nil)
+      style = verified_style!(style, object)
+      command = {namespace: :namespace_of, class: :parent_of}[style]
+      object && command && send(command, object).yield_self { |n| n && (n.respond_to?(:env_prefixes) ? n : progenitor_of(n)) }
     end
 
-    def remove_env_prefix(prefix, all: false)
-      # all is ignored as we are at the end of the chain
-      env_prefixes(dup: false).delete(prefix_from(prefix))
+    def progenitor_prefixes_of(object, style = nil, all = true)
+      Array(progenitor_of(object, style)&.env_prefixes(all))
+    end
+
+    def progenitors_of(object, style = nil, terminate = true)
+      style = verified_style!(style, object)
+      terminate = terminate && style != :none
+      if object && style != :none
+        styles = style.to_s.split('_')
+        if styles.size > 1
+          styles.flat_map{ |style| progenitors_of(object, style, false) }
+        else
+          Array(progenitor_of(object, style)).yield_self { |x| x + progenitors_of(x.last, nil, false) }
+        end
+      else
+        []
+      end.yield_self { |result| terminate ? result.reverse.uniq.reverse + [self] : result }
+    end
+
+    def remove_env_prefix(prefix, all = false)
+      env_prefixes(all, false).delete(prefix_from(prefix))
+    end
+
+    def verified_style!(style, object = nil)
+      style ||= object.respond_to?(:env_prefix_inheritance) ? object.send(:env_prefix_inheritance) : :namespace
+      style = style.try(:to_sym) || style.to_s.to_sym
+      EnvPrefixInheritanceStyles.include?(style) ? style : raise(InvalidEnvInheritanceStyle.new(style))
     end
 
     def yml_name_from(object)
@@ -172,11 +226,11 @@ module AppConfigFor
       base.add_env_prefix
     end
 
-    # Todo: Determine progenitor_of with respect to combining inheritance with namespace scoping
-    # def included(base)
-    #   base.add_env_prefix
-    # end
+    def included(base)
+      base.add_env_prefix
+    end
 
   end
 
 end
+
