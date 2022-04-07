@@ -17,7 +17,7 @@ Gem::Specification.new do |spec|
   spec.metadata["allowed_push_host"] = "TODO: Set to your gem server 'https://example.com'"
 
   spec.metadata["homepage_uri"] = spec.homepage
-  spec.metadata["source_code_uri"] = "http://127.0.0.1"
+  spec.metadata["source_code_uri"] = "https://github.com/ChapterHouse/app_config_for"
   spec.metadata["changelog_uri"] = "http://127.0.0.1"
 
   # Specify which files should be added to the gem when it is released.
@@ -33,6 +33,8 @@ Gem::Specification.new do |spec|
 
   # Uncomment to register a new dependency of your gem
   spec.add_dependency 'activesupport'
+  spec.add_development_dependency 'rake'
+  spec.add_development_dependency 'rspec'
 
   # For more information and examples about making a new gem, check out our
   # guide at: https://bundler.io/guides/creating_gem.html
