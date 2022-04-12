@@ -48,7 +48,7 @@ module AppConfigFor
   end
 
   def config_for(name, env: nil)
-    config, shared = config_options(name).fetch_values((environment || self.env).to_sym, :shared) {nil}
+    config, shared = config_options(name).fetch_values((env || self.env).to_sym, :shared) {nil}
     config ||= shared
 
     if config.is_a?(Hash)
