@@ -4,7 +4,7 @@ require_relative "lib/app_config_for/version"
 
 Gem::Specification.new do |spec|
   spec.name = "app_config_for"
-  spec.version = AppConfigFor::VERSION
+  spec.version = AppConfigFor.version
   spec.authors = ["Frank Hall"]
   spec.email = ["ChapterHouse.Dune@gmail.com"]
 
@@ -35,7 +35,7 @@ Gem::Specification.new do |spec|
   spec.require_paths = ["lib"]
 
   # Uncomment to register a new dependency of your gem
-  spec.add_dependency 'activesupport', '~> 7.0'
+  spec.add_dependency 'activesupport', '>= 5.0', '< 8'
   spec.add_development_dependency 'rake', '~> 13.0'
   spec.add_development_dependency 'rspec', '~> 3.0'
 
