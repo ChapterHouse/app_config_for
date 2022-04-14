@@ -1,5 +1,10 @@
 # frozen_string_literal: true
+require_relative "gem_version"
 
 module AppConfigFor
-  VERSION = "0.0.3"
+
+  def self.version
+    gem_version
+  end
+
 end

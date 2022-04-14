@@ -2,11 +2,19 @@
 
 require_relative "app_config_for/version"
 require_relative "app_config_for/errors"
-require 'active_support/environment_inquirer'
+
+require 'active_support/gem_version'
+if ActiveSupport.gem_version >= Gem::Version.new('6.1.4')
+  require 'active_support/environment_inquirer'
+  require 'active_support/configuration_file'
+else
+  require_relative 'app_config_for/legacy_support'
+end
+
 require 'active_support/configuration_file'
 require 'active_support/core_ext/object/blank'
 require 'active_support/core_ext/string/inflections'
-require "active_support/core_ext/hash/indifferent_access"
+require 'active_support/core_ext/hash/indifferent_access'
 require 'active_support/ordered_options'
 require 'active_support/core_ext/object/try'
 
@@ -23,9 +31,18 @@ module AppConfigFor
     env_prefixes(false, false).send(at_beginning ? :unshift : :push, AppConfigFor.prefix_from(prefix || self)).uniq!
   end
 
+  def add_config_directory(new_directory)
+    (additional_config_directories << Pathname.new(new_directory).expand_path).uniq!
+  end
+
+  def additional_config_directories
+    @additional_config_directories ||= []
+  end
+
   def config_directories
     directories = ['Rails'.safe_constantize&.application&.paths, try(:paths)].compact.map { |root| root["config"].existent.first }.compact
-    directories.map! { |directory| Pathname.new(directory) }
+    directories.map! { |directory| Pathname.new(directory).expand_path }
+    directories.concat additional_config_directories
     directories.push(Pathname.getwd + 'config')
     directories.uniq
   end
@@ -39,7 +56,7 @@ module AppConfigFor
   end
 
   def config_files(name = nil)
-    name = AppConfigFor.yml_name_from(name || self)
+    name = AppConfigFor.yml_name_from(name || config_name)
     config_directories.map { |directory| directory + name }
   end
 
@@ -59,17 +76,26 @@ module AppConfigFor
     config
   end
 
+  def config_name
+    @config_name ||= self
+  end
+
+  def config_name=(new_config_name)
+    @config_name = new_config_name
+  end
+
   def config_options(name = nil)
     file = name.is_a?(Pathname) ? name : config_file(name)
     ActiveSupport::ConfigurationFile.parse(file.to_s).deep_symbolize_keys
   rescue SystemCallError => exception
     raise ConfigNotFound.new(name.is_a?(Pathname) ? name : config_files(name), exception)
   rescue => exception
-    raise LoadError.new(file, exception)
+    raise file ? LoadError.new(file, exception) : exception
   end
 
-  def configured(env: nil)
-    config_for(self, env: env)
+  def configured(reload = false, env: nil)
+    @configured = config_for(nil, env: env) if reload || @configured.nil?
+    @configured
   end
 
   def env(reload = false)
@@ -170,7 +196,7 @@ module AppConfigFor
 
     def progenitor_of(object, style = nil)
       style = verified_style!(style, object)
-      command = {namespace: :namespace_of, class: :parent_of}[style]
+      command = {namespace: :namespace_of, class: :parent_of}[style] # Todo, deal with the other styles by doing nothing and not crashing or something.
       object && command && send(command, object).yield_self { |n| n && (n.respond_to?(:env_prefixes) ? n : progenitor_of(n)) }
     end
 
@@ -220,14 +246,20 @@ module AppConfigFor
 
     private
 
+    def prep_base(base)
+      base.add_env_prefix
+      gem = Gem.loaded_specs[base.name.underscore]
+      base.add_config_directory(gem.gem_dir + '/config') if gem
+    end
+
     def extended(base)
       # Todo: Add the ability to check the default environments directly from base if the methods don't yet exist.
       # ie: base.development? is the same as base.env.development?
-      base.add_env_prefix
+      prep_base(base)
     end
 
     def included(base)
-      base.add_env_prefix
+      prep_base(base)
     end
 
   end
