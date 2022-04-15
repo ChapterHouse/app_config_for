@@ -8,7 +8,7 @@ module AppConfigFor
     MAJOR = 0
     MINOR = 0
     TINY  = 4
-    PRE = 0
+    PRE = 1
 
     STRING = [MAJOR, MINOR, TINY, PRE].compact.join('.')
   end

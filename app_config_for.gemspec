@@ -17,7 +17,7 @@ Gem::Specification.new do |spec|
   EOF
   spec.homepage = "https://github.com/ChapterHouse/#{spec.name}"
   spec.license = "MIT"
-  spec.required_ruby_version = ">= 2.6.0"
+  spec.required_ruby_version = ">= 2.3.6"
 
   spec.metadata["homepage_uri"] = spec.homepage
   spec.metadata["source_code_uri"] = "https://github.com/ChapterHouse/#{spec.name}/tree/v#{spec.version}"

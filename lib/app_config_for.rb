@@ -11,7 +11,6 @@ else
   require_relative 'app_config_for/legacy_support'
 end
 
-require 'active_support/configuration_file'
 require 'active_support/core_ext/object/blank'
 require 'active_support/core_ext/string/inflections'
 require 'active_support/core_ext/hash/indifferent_access'
