@@ -9,9 +9,19 @@ if ActiveSupport.gem_version < Gem::Version.new('6.1.0')
   require "erb"
   require "yaml"
 
+  # @note This legacy support is only included if the existing ActiveSupport version is below 6.1.0. 
+  #   If your application is using any version of ActiveSupport below 6.1.4 it is *strongly* suggested you upgrade your application due to security and bug fixes.
+  #   This backwards compatability is only enough to support AppConfigFor and is not to be considered a full backport of existing features.
+  #   This support will be removed in the future.
   module ActiveSupport
+
+    # @note This legacy support is only included if the existing ActiveSupport version is below 6.1.0. 
+    #   If your application is using any version of ActiveSupport below 6.1.4 it is *strongly* suggested you upgrade your application due to security and bug fixes.
+    #   This backwards compatability is only enough to support AppConfigFor and is not to be considered a full backport of existing features.
+    #   This support will be removed in the future.
     class EnvironmentInquirer < StringInquirer
 
+      # Default environments
       Environments = %w(development test production)
 
       def initialize(env)
@@ -22,6 +32,10 @@ if ActiveSupport.gem_version < Gem::Version.new('6.1.0')
       Environments.each { |e| define_method("#{e}?") { instance_variable_get("@#{e}") }}
     end
 
+    # @note This legacy support is only included if the existing ActiveSupport version is below 6.1.0. 
+    #   If your application is using any version of ActiveSupport below 6.1.4 it is *strongly* suggested you upgrade your application due to security and bug fixes.
+    #   This backwards compatability is only enough to support AppConfigFor and is not to be considered a full backport of existing features.
+    #   This support will be removed in the future.
     class ConfigurationFile
       def initialize(file_name)
         @file_name = file_name
@@ -29,10 +43,12 @@ if ActiveSupport.gem_version < Gem::Version.new('6.1.0')
         warn(file_name + ' contains invisible non-breaking spaces.') if @config.match?("\u00A0")
       end
 
+      # Quick and dirty parse
       def self.parse(file_name)
         new(file_name).parse
       end
 
+      # Quick and dirty parse
       def parse
         YAML.load(ERB.new(@config).result) || {}
       rescue Psych::SyntaxError => e

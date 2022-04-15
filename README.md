@@ -20,54 +20,52 @@ Or install it yourself as:
 
 ## Usage
 Presume a typical rails database config at ./config/database.yml  
-One environment variable ('MY_APP_ENV', 'RAILS_ENV', or 'RACK_ENV') is set to 'development'
+One environment variable ('MY_APP_ENV', 'RAILS_ENV', or 'RACK_ENV') is set to 'development' or all are non existent.
 
-#### ./config/my_app.yml
+#### ./config/sample_app.yml
 ```yml
 default: &default
-site: <%= ENV.fetch("MY_APP_SITE", 'www.slackware.com') %>
-password: Slackware#1!
+  site: <%= ENV.fetch("MY_APP_SITE", 'www.slackware.com') %>
+  password: Slackware#1!
 
 development:
-<<: *default
-username: Linux
+  <<: *default
+  username: Linux
 
 test:
-<<: *default
-username: TestingWith
+  <<: *default
+  username: TestingWith
 
 production:
-<<: *default
-username: DefinitelyUsing
+  <<: *default
+  username: DefinitelyUsing
 
 shared:
-color: 'Blue'
+  color: 'Blue'
 ```
 
-#### ./my_class.rb
+#### sample_application.rb
 ```ruby
 require 'app_config_for'
 
-module MyApp
-
+module Sample
+  class App
     extend AppConfigFor
-
-    class MyClass
-        def info
-            puts "Curent environment is #{MyApp.env}"
-
-            puts "Remote Host: #{MyApp.configured.site}"
-
-            # Can access same configuration in other ways
-            puts "Username: MyApp.config_for(:my_app)[:username]"
-            puts "Password: MyApp.config_for(MyApp).username"
-
-            # Access a different config
-            if MyApp.config_file?(:database)
-                puts "Rails database config: MyApp.config_for(:database)"
-            end
-        end
+    def info
+      puts "Current environment is #{App.env}"
+ 
+      puts "Remote Host: #{App.configured.site}"
+ 
+      # Can access same configuration in other ways
+      puts "Username: self.class.config_for(:app)[:username]"
+      puts "Password: App.config_for(App).username"
+ 
+      # Access a different config
+      if App.config_file?(:database)
+        puts "Rails database config: App.config_for(:database)"
+      end
     end
+  end
 end
 ```
 
