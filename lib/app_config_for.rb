@@ -16,7 +16,10 @@ require 'active_support/core_ext/string/inflections'
 require 'active_support/core_ext/hash/indifferent_access'
 require 'active_support/ordered_options'
 require 'active_support/core_ext/object/try'
+require 'active_support/backtrace_cleaner'
 
+# {<img src="https://badge.fury.io/rb/app_config_for.svg" alt="Gem Version" />}[https://badge.fury.io/rb/app_config_for]
+# 
 # Ruby gem providing Rails::Application#config_for style capabilities for non-rails applications, gems, and rails engines.  
 # It respects RAILS_ENV and RACK_ENV while providing additional capabilities beyond Rails::Application#config_for.
 # 
@@ -55,16 +58,17 @@ require 'active_support/core_ext/object/try'
 #      extend AppConfigFor
 #      def info
 #        puts "Current environment is #{App.env}"
-# 
-#        puts "Remote Host: #{App.configured.site}"
-# 
-#        # Can access same configuration in other ways
-#        puts "Username: self.class.config_for(:app)[:username]"
-#        puts "Password: App.config_for(App).username"
+#
+#        # Access the configuration in various ways depending on need/preference.
+#        puts "Remote Host: #{App.site}"
+#        puts "Username:    #{App.configured.username}"
+#        puts "Password:    #{App.config_for(App).password}"
+#        puts "Domain:      #{self.class.config_for(:app)[:domain]}"
 # 
 #        # Access a different config
 #        if App.config_file?(:database)
-#          puts "Rails database config: App.config_for(:database)"
+#          adapter_name = App.config_for(:database).adapter
+#          puts "Rails is using the #{adapter_name} adapter."
 #        end
 #      end
 #    end
@@ -194,42 +198,50 @@ module AppConfigFor
   # Configuration file that will be used.
   # This is the first file from {#config_files} that exists or +nil+ if none exists.
   # @param name [Symbol, Object] Name of the config to load.  
-  #  {#config_names} will be used if name is +nil+
   #  Conversion to a file name will occur using {.yml_name_from AppConfigFor.yml_name_from}.  
+  #  If name is +nil+ {#config_names} will be used.
+  # @param fallback [Symbol, Object] If not +nil+, attempt to load a fallback configuration if the requested one cannot be found.  
   # @return [Pathname, nil]
-  def config_file(name = nil)
+  def config_file(name = nil, fallback = nil)
     unless name.is_a?(Pathname)
       config_files(name).find(&:exist?)
     else
       name.exist? ? name.expand_path : nil
-    end
+    end.yield_self { |file| file || fallback && config_file(fallback) }
   end
 
   # The list of potential config files that will be searched for and the order in which they will be searched.
   # @param name [Symbol, Object] Name of the config to load.  
-  #  {#config_names} will be used if name is +nil+
   #  Conversion to a file name will occur using {.yml_name_from AppConfigFor.yml_name_from}.  
+  #  If name is +nil+, {#config_names} will be used.  
+  #  If name is object that responds to +config_files+, it will be called instead.
   # @return [Array<Pathname>]
   def config_files(name = nil)
-    names = (name && Array(name) || config_names).map { |name| AppConfigFor.yml_name_from(name) }
-    config_directories.map { |directory| names.map { |name| directory + name } }.flatten
+    if name.respond_to?(:config_files) && name != self
+      name.config_files
+    else
+      names = (name && name != self && Array(name) || config_names).map { |name| AppConfigFor.yml_name_from(name) }
+      config_directories.map { |directory| names.map { |name| directory + name } }.flatten
+    end
   end
 
   # Does a config file exit?
   # @param name [Symbol, Object] Name of the config to load.  
-  #  {#config_names} will be used if name is +nil+
   #  Conversion to a file name will occur using {.yml_name_from AppConfigFor.yml_name_from}.  
+  #  If name is +nil+ {#config_names} will be used.
+  # @param fallback [Symbol, Object] If not +nil+, attempt to load a fallback configuration if the requested one cannot be found.  
   # @return [Boolean]
-  def config_file?(name = nil)
-    !config_file(name).blank?
+  def config_file?(name = nil, fallback = nil)
+    !config_file(name, fallback).blank?
   end
 
   # Configuration settings for the current environment.
   # Shared sections in the yml config file are automatically merged into the returned configuration.
   # @param name [Symbol, Object] Name of the config to load.  
-  #  {#config_names} will be used if name is +nil+
   #  Conversion to a file name will occur using {.yml_name_from AppConfigFor.yml_name_from}.  
+  #  If name is +nil+ {#config_names} will be used.
   # @param env [Symbol, String] name of environment to use. +nil+ will use the current environment settings from {#env}
+  # @param fallback [Symbol, Object] If not +nil+, attempt to load a fallback configuration if the requested one cannot be found.  
   # @return [ActiveSupport::OrderedOptions]
   # @raise ConfigNotFound - No configuration file could be located.
   # @raise LoadError - A configuration file was found but could not be properly read.
@@ -247,8 +259,8 @@ module AppConfigFor
   #   # Load other_app.yml and extract the 'production' section.
   #   # Notice that Other::App does not need to extend AppConfigFor
   #   config_for(Other::App, env: :production)
-  def config_for(name, env: nil)
-    config, shared = config_options(name).fetch_values((env || self.env).to_sym, :shared) { nil }
+  def config_for(name, env: nil, fallback: nil)
+    config, shared = config_options(name, fallback).fetch_values((env || self.env).to_sym, :shared) { nil }
     config ||= shared
 
     if config.is_a?(Hash)
@@ -279,16 +291,19 @@ module AppConfigFor
 
   # Configuration for all environments parsed from the {#config_file}.
   # @param name [Symbol, Object] Name of the config to load.  
-  #  {#config_names} will be used if name is +nil+
   #  Conversion to a file name will occur using {.yml_name_from AppConfigFor.yml_name_from}.  
+  #  If name is +nil+ {#config_names} will be used.
+  # @param fallback [Symbol, Object] If not +nil+, attempt to load a fallback configuration if the requested one cannot be found.  
   # @return [Hash]
   # @raise ConfigNotFound - No configuration file could be located.
   # @raise LoadError - A configuration file was found but could not be properly read.
-  def config_options(name = nil)
-    file = (name.is_a?(Pathname) ? name : config_file(name)).to_s
-    ActiveSupport::ConfigurationFile.parse(file.to_s).deep_symbolize_keys
+  def config_options(name = nil, fallback = nil)
+    file = config_file(name, fallback).to_s
+    ActiveSupport::ConfigurationFile.parse(file).deep_symbolize_keys
   rescue SystemCallError => exception
-    raise ConfigNotFound.new(name.is_a?(Pathname) ? name : config_files(name), exception)
+    locations = name.is_a?(Pathname) ? Array(name) : config_files(name)
+    locations += config_files(fallback) if fallback
+    raise ConfigNotFound.new(locations, exception)
   rescue => exception
     raise file ? LoadError.new(file, exception) : exception
   end
@@ -302,13 +317,17 @@ module AppConfigFor
   #   module Sample
   #     class App
   #       extend AppConfigFor
-  #       mattr_accessor :logger, default: Logger.new($stdout)
-  #       logger.level = configured.log_level
+  #       @@logger = Logger.new($stdout, level: configured.level)
   #     end
   #   end
   #   Sample::App.configured.url    # Get the configured url from my_app.yml for the current environment
+  # @see #method_missing Accessing configuration values directly from the extending class/module
   def configured(reload = false)
-    @configured = config_for(nil, env: env(reload)) if reload || @configured.nil?
+    if reload || !@configured
+      # @disable_local_missing = true # Disable local method missing to prevent recursion
+      @configured = config_for(nil, env: env(reload))
+      # @disable_local_missing = false # Reenable local method missing since no exception occurred.
+    end
     @configured
   end
 
@@ -330,6 +349,30 @@ module AppConfigFor
   #   Sample::App.logger.level = Sample::App.configured!.log_level
   def configured!
     configured(true)
+  end
+
+  # Check for the existence of a configuration setting. Handles exceptions and recursion.
+  # @param key [#to_s] Key to check for
+  # @return [Boolean]
+  #   * +true+ - Configuration has the key
+  #   * +false+ - If one of the following: 
+  #     1. Configuration does not have the key
+  #     2. Called recursively while retrieving the configuration
+  #     3. An exception is raised while retrieving the configuration
+  # @note This is primarily used internally during {#respond_to_missing?} and {#method_missing} calls.
+  def configured?(key)
+    if @disable_local_missing
+      false
+    else
+      @disable_local_missing = true
+      begin
+        configured.has_key?(key.to_s.to_sym)
+      rescue Exception # One of the few times you ever want to catch this exception and not reraise it.
+        false
+      ensure
+        @disable_local_missing = false
+      end
+    end
   end
 
   # Returns the current runtime environment. Caches the result.
@@ -427,6 +470,40 @@ module AppConfigFor
     end
   end
 
+  # Allow access to configuration getters and setters directly from the extending class/module.
+  # @example
+  #   class Sample
+  #     extend AppConfigFor
+  #   end
+  # 
+  #   # Presuming config/sample.yml contains a configuration for 'log_level' and 'status' but no other keys.
+  #   Sample.log_level          # => :production
+  #   Sample.log_level = :debug 
+  #   Sample.log_level          # => :debug
+  # 
+  #   # You are allowed to set the value prior reading it should the need should arise.
+  #   Sample.status = 'active'  
+  #   Sample.status             # => 'active'
+  # 
+  #   # However, you cannot invent new keys with these methods.
+  #   Sample.something_else     # => NoMethodError(undefined method `something_else' for Sample)
+  #   Sample.something_else = 1 # => NoMethodError(undefined method `something_else=' for Sample)
+  # @note Values can be written or read prior to the loading of the configuration presuming the configuration can load without error.
+  def method_missing(name, *args, &block)
+    if configured?(name.to_s.split('=').first.to_sym)
+      configured.send(name, *args, &block)
+    else
+      begin
+        super
+      rescue Exception => e
+        # Remove the call to super from the backtrace to make it more apparent where the failure occurred,
+        super_line = Regexp.new("#{__FILE__}:#{__LINE__ - 3}") 
+        e.set_backtrace(ActiveSupport::BacktraceCleaner.new.tap { |bc| bc.add_silencer { |line| line =~ super_line } }.clean(e.backtrace))
+        raise e
+      end
+    end
+  end
+  
   # Remove an environmental prefix from the existing list. 
   # @param prefix [Symbol, Object] Prefix to remove.  
   #  +nil+ is treated as +self+   
@@ -445,6 +522,12 @@ module AppConfigFor
     env_prefixes(all)
   end
 
+  # Return true if the missing method is a configuration getter or setter.
+  # @see #method_missing Accessing configuration values directly from the extending class/module
+  def respond_to_missing?(name, *args)
+    configured?(name.to_s.split('=').first.to_sym) || super
+  end
+  
   class << self
 
     # Add an additional environmental prefix to be used when determining current environment.

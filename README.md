@@ -1,4 +1,4 @@
-# AppConfigFor
+# AppConfigFor [![Gem Version](https://badge.fury.io/rb/app_config_for.svg)](https://badge.fury.io/rb/app_config_for)
 
 Ruby gem providing Rails::Application#config_for style capabilities for non-rails applications, gems, and rails engines.
 
