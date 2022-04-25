@@ -10,8 +10,8 @@ module AppConfigFor
   module VERSION
     MAJOR = 0 # A field-grade officer
     MINOR = 0 # When the semitones show up as intervals between the 2nd and 3rd degrees
-    TINY  = 6 # The number of people who use antidisestablishmentarianism in everyday conversation
-    PRE = 2   # Ante not auntie
+    TINY  = 7 # The number of people who use antidisestablishmentarianism in everyday conversation
+    PRE = 0   # Ante not auntie
 
     # String form of the version (duh). Are you seriously reading this? I guess it is slightly more interesting that Moby-Dick.
     STRING = [MAJOR, MINOR, TINY, PRE].compact.join('.') 
