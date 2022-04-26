@@ -587,14 +587,7 @@ module AppConfigFor
     #   namespace_of(Some::App.new)  # => Some
     #   namespace_of(Some)           # => nil
     def namespace_of(object)
-      case object
-      when String
-        object
-      when Module
-        object.name
-      else
-        object.class.name
-      end.deconstantize.safe_constantize
+      (String === object ? object : nearest_named_class(object).name).deconstantize.safe_constantize
     end
 
     # Array of all hierarchical lexical namespaces of an object. Uses {.namespace_of}
@@ -613,7 +606,21 @@ module AppConfigFor
     def namespaces_of(object)
       (object = [namespace_of(object)]).each { |x| x && object << namespace_of(x) }[0..-2]
     end
-
+    
+    # Locate the nearest class that is not anonymous.
+    # @param object [Object]
+    # @return [Class] The first non-anonymous class that is in the class hierarchy.
+    def nearest_named_class(object)
+      # Switch from an instance to a class
+      object = object.class unless object.is_a?(Module)
+      # Switch from anonymous module to a class unless it provides a name
+      object = object.class unless object.try(:name) || object.respond_to?(:superclass)
+      # Continue up the hierarchy while we are in an anonymous class
+      object = object.superclass while object.name.nil?
+      object
+    end
+    
+    # Parent of an object.
     # Parent of an object.
     # While similar to inheritance it provides a meaningful value for strings and other objects.
     # Classes return super classes.
@@ -692,14 +699,12 @@ module AppConfigFor
         object
       else
         case object
-        when Module
-          object.name
         when String
           object
         when Pathname
           object.basename('.*').to_s
         else
-          object.class.name
+          nearest_named_class(object).name
         end.underscore.gsub('/','_').to_sym
      end
     end
@@ -809,18 +814,16 @@ module AppConfigFor
         object
       else
         case object
-        when Module
-          object.name
         when String
           object
         when Symbol
           object.to_s
         else
-          object.class.name
+          nearest_named_class(object).name
         end.underscore.gsub('/','_') + '.yml'
       end
     end
-
+    
     private
 
     # Add the config directory from the gem installation if this is a gem.

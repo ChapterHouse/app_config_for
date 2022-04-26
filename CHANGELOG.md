@@ -46,3 +46,7 @@
 
 ## [0.0.6.1] - 2022-04-25
 - Fixed issue when initializing env_prefixes in a namespaced module/class.
+
+## [0.0.6.2] - 2022-04-26
+- When namespace_of, prefix_from, and yml_name_from encounter an anonymous class/module, the class hierarchy will be traversed until a name is found.
+ 

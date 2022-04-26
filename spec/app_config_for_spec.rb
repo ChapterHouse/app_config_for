@@ -39,13 +39,13 @@ RSpec.describe AppConfigFor do
 
     it 'uses Module#name' do
       m = Module.new
-      expect(m).to receive(:name).and_return('Foo')
+      expect(m).to receive(:name).and_return('Foo').at_least(:once)
       expect(AppConfigFor.yml_name_from(m)).to eql('foo.yml')
     end
 
     it 'uses Class#name' do
       c = Class.new
-      expect(c).to receive(:name).and_return('Foo')
+      expect(c).to receive(:name).and_return('Foo').at_least(:once)
       expect(AppConfigFor.yml_name_from(c)).to eql('foo.yml')
     end
 
@@ -69,6 +69,19 @@ RSpec.describe AppConfigFor do
       expect(AppConfigFor.yml_name_from('foo/bar')).to eql('foo_bar.yml')
     end
 
+    context 'working with anonymous objects' do
+      
+      it 'uses the class hierarchy for classes' do
+        expect(AppConfigFor.yml_name_from(Class.new)).to eql('object.yml')
+      end
+
+      it 'uses the class hierarchy for modules' do
+        expect(AppConfigFor.yml_name_from(Module.new)).to eql('module.yml')
+      end
+
+    end
+    
+    
   end
   
 end
