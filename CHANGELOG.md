@@ -43,3 +43,6 @@
 - Documentation updates.
 - Fallback configuration support.
 - Requesting configuration for another object that can supply it's own config_files will use those files instead of locally determining them.
+
+## [0.0.6.1] - 2022-04-25
+- Fixed issue when initializing env_prefixes in a namespaced module/class.

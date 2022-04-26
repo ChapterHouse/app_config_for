@@ -462,7 +462,10 @@ module AppConfigFor
   # @see remove_env_prefix Removing a prefix
   # @see env_name Current runtime environment
   def env_prefixes(all = true, dup = true)
-    @env_prefixes ||= [self]
+    unless @env_prefixes
+      @env_prefixes = []
+      add_env_prefix
+    end
     if all
       @env_prefixes + AppConfigFor.progenitor_prefixes_of(self)
     else
