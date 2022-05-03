@@ -122,7 +122,36 @@ RSpec.describe AppConfigFor do
       
     end
   
-    
+    describe '.namespace_of' do
+      
+      it 'determines the lexical namespace of an class' do
+        expect(AppConfigFor.namespace_of(self.class)).to eq(RSpec::ExampleGroups::AppConfigFor::CommonSupportMethods)
+      end
+
+      it 'the namespace of an instance is the same as the same as the class' do
+        expect(AppConfigFor.namespace_of(self)).to eq(AppConfigFor.namespace_of(self.class))
+      end
+
+      it 'the namespace of a class name is the same as the same as the class' do
+        expect(AppConfigFor.namespace_of(self.class.name)).to eq(AppConfigFor.namespace_of(self.class))
+      end
+
+      it 'is nil if there is no surrounding namespace' do
+        expect(AppConfigFor.namespace_of(Object)).to be_nil
+        expect(AppConfigFor.namespace_of('blarg')).to be_nil
+      end
+      
+      it 'uses nearest_named_class if not given a string' do
+        expect(AppConfigFor).to receive(:nearest_named_class).with(self).and_return(Object)
+        AppConfigFor.namespace_of(self)
+      end
+
+      it 'uses a string as the name of a class and does not call nearest_named_class' do
+        expect(AppConfigFor).to_not receive(:nearest_named_class)
+        AppConfigFor.namespace_of(self.class.name)
+      end
+
+    end
 
     describe '.verified_style!' do
       
