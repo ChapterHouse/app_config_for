@@ -3,6 +3,104 @@ require 'spec_helper'
 
 RSpec.describe AppConfigFor do
 
+  let(:env_prefixes) { double }
+  
+  describe '.add_env_prefix' do
+
+    let(:env_prefixes_duped) { double }
+
+    before(:each) do
+      allow(AppConfigFor).to receive(:env_prefixes).with(false, false).and_return(env_prefixes)
+      allow(AppConfigFor).to receive(:env_prefixes).with(false).and_return(env_prefixes)
+
+      allow(env_prefixes).to receive(:push).and_return(env_prefixes)
+      allow(env_prefixes).to receive(:unshift).and_return(env_prefixes)
+      allow(env_prefixes).to receive(:uniq!)
+
+      allow(AppConfigFor).to receive(:env_prefixes).with(false).and_return(env_prefixes_duped)
+    end
+
+    it 'fetches the current prefixes without duplication' do
+      expect(AppConfigFor).to receive(:env_prefixes).with(false, false)
+      AppConfigFor.add_env_prefix(:foo)
+    end
+
+    it 'adds to the beginning of the array if at_beginning is true' do
+      expect(env_prefixes).to receive(:unshift)
+      AppConfigFor.add_env_prefix(:foo, true)
+    end
+
+    it 'adds to the end of the array if at_beginning is false' do
+      expect(env_prefixes).to receive(:push)
+      AppConfigFor.add_env_prefix(:foo, false)
+    end
+
+    it 'adds to the beginning of the array by default' do
+      expect(env_prefixes).to receive(:unshift)
+      AppConfigFor.add_env_prefix(:foo)
+    end
+    
+    it 'uses prefix_from to convert the prefix as needed' do
+      prefix = double
+      expect(AppConfigFor).to receive(:prefix_from).with(prefix)
+      AppConfigFor.add_env_prefix(prefix)
+    end
+
+    it 'ensures the prefixes are uniq' do
+      expect(env_prefixes).to receive(:uniq!)
+      AppConfigFor.add_env_prefix(:foo)
+    end
+    
+    it 'returns the current prefixes duped' do
+      expect(AppConfigFor).to receive(:env_prefixes).with(false).and_return(env_prefixes_duped)
+      expect(AppConfigFor.add_env_prefix(:foo)).to eq(env_prefixes_duped)
+    end
+    
+  end
+
+  describe ".env_name" do
+    
+    before(:each) do
+      allow(ENV).to receive(:[])
+    end
+    
+    it 'defaults prefixes to env_prefixes' do
+      expect(AppConfigFor).to receive(:env_prefixes).and_return(env_prefixes)
+      AppConfigFor.env_name
+    end
+
+    it 'can accept a single prefix' do
+      prefix = double
+      expect(AppConfigFor).to receive(:Array).with(prefix).and_call_original
+      AppConfigFor.env_name(prefix)
+    end
+    
+    it 'locates the first environment variable that is not blank' do
+      prefixes = %w(a b c d).map { |x| double(to_s: x) }
+      env_value = double
+      
+      expect(ENV).to receive(:[]).with(prefixes[0].to_s.upcase + '_ENV').and_return(nil)
+      expect(ENV).to receive(:[]).with(prefixes[1].to_s.upcase + '_ENV').and_return('')
+      expect(ENV).to receive(:[]).with(prefixes[2].to_s.upcase + '_ENV').and_return(env_value)
+      prefixes[3..-1].each { |prefix| expect(ENV).to_not receive(:[]).with(prefix) }
+      
+      expect(AppConfigFor.env_name(prefixes)).to eq(env_value)
+    end
+
+    it 'defaults to development' do
+      expect(AppConfigFor.env_name).to eq('development')
+    end
+    
+  end
+
+  describe '.env_prefixes' do
+    
+    it 'needs a test written' do
+      expect(true).to eq(false)
+    end
+    
+  end
+
   describe '.verified_style!' do
     
     context 'when given a bad style' do
