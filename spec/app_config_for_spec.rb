@@ -241,6 +241,62 @@ RSpec.describe AppConfigFor do
 
     end
 
+    describe '.progenitor_of' do
+
+      it 'search uses .namespace_of when inheritance style is :namespace' do
+        object = double
+        expect(AppConfigFor).to receive(:namespace_of).with(object)
+        AppConfigFor.progenitor_of(object, :namespace)
+      end
+
+      it 'search uses .parent_of when inheritance style is :class' do
+        object = double
+        expect(AppConfigFor).to receive(:parent_of).with(object)
+        AppConfigFor.progenitor_of(object, :class)
+      end
+
+      it 'search uses .namespace_of when inheritance style is :namespace_class' do
+        object = double
+        expect(AppConfigFor).to receive(:namespace_of).with(object)
+        AppConfigFor.progenitor_of(object, :namespace_class)
+      end
+
+      it 'search uses .parent_of when inheritance style is :class_namespace' do
+        object = double
+        expect(AppConfigFor).to receive(:parent_of).with(object)
+        AppConfigFor.progenitor_of(object, :class_namespace)
+      end
+
+      it 'search defaults to :namespace' do
+        object = double
+        expect(AppConfigFor).to receive(:namespace_of).with(object)
+        AppConfigFor.progenitor_of(object)
+      end
+
+      it 'verifies the style given' do
+        style = :foo
+        object = double
+        expect(AppConfigFor).to receive(:verified_style!).with(style, object).and_return('x')
+        AppConfigFor.progenitor_of(object, style)
+      end
+
+      it 'identifies the first env_prefix namespace/parent of an object' do
+        acf_namespace = double(env_prefixes: [])
+        normal_namespace = double
+        object = double
+        expect(AppConfigFor).to receive(:namespace_of).with(object).and_return(normal_namespace)
+        expect(AppConfigFor).to receive(:namespace_of).with(normal_namespace).and_return(acf_namespace)
+        expect(AppConfigFor.progenitor_of(object)).to eql(acf_namespace)
+      end
+
+      it 'is nil if a progenitor cannot be located' do
+        object = double
+        expect(AppConfigFor).to receive(:namespace_of).with(object).and_return(nil)
+        expect(AppConfigFor.progenitor_of(object)).to be_nil
+      end
+
+    end
+
     describe '.verified_style!' do
       
       context 'when given a bad style' do
