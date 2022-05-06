@@ -297,6 +297,32 @@ RSpec.describe AppConfigFor do
 
     end
 
+    describe '.progenitors_of' do
+
+      it 'is an empty array if style is :none' do
+        object = double
+        expect(AppConfigFor.progenitors_of(object, :none)).to eq([])
+      end
+
+      it 'is an empty array if the object is nil' do
+        expect(AppConfigFor.progenitors_of(nil, :none)).to eq([])
+      end
+
+      it 'uses progenitor with the style :namespace if called with the style :namespace' do
+        expect(AppConfigFor).to receive()
+        AppConfigFor.progenitors_of(object, :namespace)
+      end
+
+      it 'verifies the style given' do
+        style = :foo
+        object = double
+        expect(AppConfigFor).to receive(:verified_style!).with(style, object).and_return(:none)
+        AppConfigFor.progenitors_of(object, style)
+      end
+
+
+    end
+
     describe '.verified_style!' do
       
       context 'when given a bad style' do

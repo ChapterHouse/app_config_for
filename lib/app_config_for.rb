@@ -749,7 +749,7 @@ module AppConfigFor
       if object && style != :none
         styles = style.to_s.split('_')
         if styles.size > 1
-          styles.flat_map{ |style| progenitors_of(object, style, false) }
+          styles.flat_map { |style| progenitors_of(object, style, false) }
         else
           Array(progenitor_of(object, style)).yield_self { |x| x + progenitors_of(x.last, nil, false) }
         end
