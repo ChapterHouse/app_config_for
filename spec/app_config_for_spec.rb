@@ -214,6 +214,33 @@ RSpec.describe AppConfigFor do
 
     end
 
+    describe '.prefix_from' do
+
+      it 'converts a String to an underscored symbol' do
+        expect(AppConfigFor.prefix_from('Some::App')).to eql(:some_app)
+      end
+
+      it 'converts "/" characters to underscores' do
+        expect(AppConfigFor.prefix_from('some/app')).to eql(:some_app)
+      end
+
+      it 'uses the basename without an extension for a Pathname' do
+        expect(AppConfigFor.prefix_from(Pathname.new('/foo/bar/some_app.yml'))).to eql(:some_app)
+      end
+
+      it 'does not attept to convert symbols' do
+        s = :SomeApp
+        expect(AppConfigFor.prefix_from(s)).to eql(s)
+      end
+
+      it 'uses the name of the nearest named class if not given a Symbol, String, or Pathname' do
+        e = AppConfigFor::Error.new
+        expect(AppConfigFor).to receive(:nearest_named_class).with(e).and_call_original
+        expect(AppConfigFor.prefix_from(e)).to eql(:app_config_for_error)
+      end
+
+    end
+
     describe '.verified_style!' do
       
       context 'when given a bad style' do
