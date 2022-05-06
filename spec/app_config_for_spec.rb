@@ -153,6 +153,67 @@ RSpec.describe AppConfigFor do
 
     end
 
+    describe '.nearest_named_class' do
+
+      it 'is the class of the instance given' do
+        expect(AppConfigFor.nearest_named_class('')).to eql(String)
+      end
+
+      it 'is the same as a named class given' do
+        expect(AppConfigFor.nearest_named_class(String)).to eql(String)
+      end
+
+      it 'is the nearest super class that has a name' do
+        expect(AppConfigFor.nearest_named_class(Class.new(self.class))).to eql(self.class)
+      end
+
+      it 'is Module for anonymous modules' do
+        expect(AppConfigFor.nearest_named_class(Module.new)).to eql(Module)
+      end
+
+      it 'is an anonymous class if that class provides a name' do
+        c = Class.new
+        c.define_singleton_method(:name) { 'Foo' }
+        expect(AppConfigFor.nearest_named_class(c)).to eql(c)
+      end
+
+    end
+
+    describe '.parent_of' do
+
+      it 'is the superclass of a class' do
+        expect(AppConfigFor.parent_of(self.class)).to eql(self.class.superclass)
+      end
+
+      it 'is the class of an instance' do
+        expect(AppConfigFor.parent_of(self)).to eql(self.class)
+      end
+
+      it 'is the named class for a string' do
+        expect(AppConfigFor.parent_of(self.class.name)).to eql(self.class)
+      end
+
+      it 'is nil if the string cannot be resolved to an existing class name' do
+        expect(AppConfigFor.parent_of('foo')).to be_nil
+      end
+
+    end
+
+    describe '.parents_of' do
+
+      it 'is an array of all hierarchical parents of the given object' do
+        foo = Class.new
+        bar = Class.new(foo)
+        baz = Class.new(bar)
+        expect(AppConfigFor.parents_of(baz.new)).to eq([baz, bar, foo, Object, BasicObject])
+      end
+
+      it 'is an empty array if no parent can be located' do
+        expect(AppConfigFor.parents_of('wtf')).to eq([])
+      end
+
+    end
+
     describe '.verified_style!' do
       
       context 'when given a bad style' do

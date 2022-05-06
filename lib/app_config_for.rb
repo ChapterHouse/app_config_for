@@ -621,7 +621,6 @@ module AppConfigFor
     end
     
     # Parent of an object.
-    # Parent of an object.
     # While similar to inheritance it provides a meaningful value for strings and other objects.
     # Classes return super classes.
     # Strings are treated as a name of a class and an attempt is made to locate that class (not the superclass of the named class).
