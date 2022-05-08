@@ -324,14 +324,30 @@ RSpec.describe AppConfigFor do
     describe '.progenitors_of' do
 
       let(:namespaces) { (1..5).inject([]) { |a, i| a << [a.last, "N#{i}"].compact.join('::'); a  }.reverse.map { |x| double(x) } }
+      let(:classes) { (1..5).inject([]) { |a, i| a << double("C#{i}") }.reverse }
       let(:object) { double('object') }
       
       before(:each) do
         # allow(AppConfigFor).to receive(:progenitors_of).with(namespaces.first, nil, false).and_return(namespaces[1..-1])
-        ([nil] + namespaces).each_cons(2).to_a.map(&:reverse).each do |param, result|
-          allow(AppConfigFor).to receive(:progenitor_of).with(param, nil).and_return(result)
+        namespaces.each { |klass| allow(klass).to receive(:env_inheritance).and_return(:namespace) }
+        (namespaces + [nil]).each_cons(2).to_a.each do |param, result|
+          allow(AppConfigFor).to receive(:progenitor_of).with(param, :namespace).and_return(result)
         end
+
+        classes.each do |klass|
+          allow(klass).to receive(:env_inheritance).and_return(:class)
+          allow(AppConfigFor).to receive(:progenitor_of).with(klass, :namespace).and_return(nil)
+        end
+        (classes + [Object]).each_cons(2).to_a.each do |param, result|
+          allow(AppConfigFor).to receive(:progenitor_of).with(param, :class).and_return(result)
+        end
+        # classes.zip(namespaces).each do |klass, namespace|
+        #   allow(AppConfigFor).to receive(:progenitor_of).with(klass, :namespace).and_return(nil)
+        # end
+
         allow(AppConfigFor).to receive(:progenitor_of).with(object, :namespace).and_return(namespaces.first)
+        puts "class: #{object.inspect} -> #{classes.first.inspect}"
+        allow(AppConfigFor).to receive(:progenitor_of).with(object, :class).and_return(classes.first)
       end
 
       it 'is an empty array if style is :none' do
@@ -344,41 +360,46 @@ RSpec.describe AppConfigFor do
       
       it 'verifies the style given' do
         style = :foo
-        object = double
         expect(AppConfigFor).to receive(:verified_style!).with(style, object).and_return(:none)
         AppConfigFor.progenitors_of(object, style)
       end
 
       it 'requests the progenitor of the object given with the requested inheritance style' do
-        style = :namespace
-        object = double
+        style = :class
         expect(AppConfigFor).to receive(:progenitor_of).with(object, style)
         AppConfigFor.progenitors_of(object, style)
       end
 
       it 'uses a default style of :namespace if none is given' do
-        object = double
         expect(AppConfigFor).to receive(:progenitor_of).with(object, :namespace)
         AppConfigFor.progenitors_of(object)
       end
 
+      it 'follows the namespace hierarchy when style is :namespace' do
+        expect(AppConfigFor.progenitors_of(object, :namespace)).to eq(namespaces + [AppConfigFor])
+      end
 
-      it 'needs tests' do
-        # Test all styles
-        expect(true).to be_falsey
+      it 'follows the class hierarchy when style is :class' do
+        expect(AppConfigFor.progenitors_of(object, :class)).to eq(namespaces + [AppConfigFor])
       end
 
 
+      # it 'needs tests' do
+      #   # Test all styles
+      #   expect(true).to be_falsey
+      # end
+
+      it 'removes duplicates if unique = true' do
+        expect(AppConfigFor.progenitors_of(object, :namespace)).to eq(namespaces + [AppConfigFor])
+      end
+
+      # it 'leaves duplicates if unique = false' do
+      #   puts "This needs to be namespace_class"
+      #   expect(AppConfigFor.progenitors_of(object, :namespace)).to eq(namespaces + [AppConfigFor])
+      # end
 
       it 'defaults to unique = true' do
-        # progenitors = (1..5).map { |i| double("p#{i}") }
-        object = double
-        # allow(AppConfigFor).to receive(:progenitor_of).with(object, :namespace).and_return(namespaces.first)
-        # allow(AppConfigFor).to receive(:progenitors_of).with(namespaces.first, nil, false).and_return(namespaces[1..-1])
-        # allow(AppConfigFor).to receive(:progenitors_of).with(object, :namespace).and_call_original
-        # zzz
-        x = AppConfigFor.progenitors_of(object, :namespace)
-        expect(x).to eq(namespaces + [AppConfigFor])
+        expect(AppConfigFor.progenitors_of(object, :namespace)).to eq(namespaces + [AppConfigFor])
       end
       
     end
