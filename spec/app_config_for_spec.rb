@@ -153,6 +153,22 @@ RSpec.describe AppConfigFor do
 
     end
 
+    describe '.namespaces_of' do
+
+      it 'is an array of the hierarchical namespaces of an object' do
+        namespaces = 'Foo::Bar::Baz::Buz'.split('::').inject([]) { |a, x| a << [a.last, x].compact.join('::') }
+        ([nil] + namespaces).each_cons(2).to_a.map(&:reverse).each do |param, result|
+          expect(AppConfigFor).to receive(:namespace_of).with(param).and_return(result)
+        end
+        expect(AppConfigFor.namespaces_of(namespaces.last)).to eq(namespaces[0..-2].reverse)
+      end
+      
+      it 'is an empty array if no napesoace can be located' do
+        expect(AppConfigFor.namespaces_of(Object)).to eq([])
+      end
+      
+    end
+    
     describe '.nearest_named_class' do
 
       it 'is the class of the instance given' do
@@ -297,22 +313,35 @@ RSpec.describe AppConfigFor do
 
     end
 
+    describe '.progenitor_prefixes_of' do
+
+      it 'needs tests' do
+        expect(true).to be_falsey
+      end
+
+    end
+
     describe '.progenitors_of' do
 
+      let(:namespaces) { (1..5).inject([]) { |a, i| a << [a.last, "N#{i}"].compact.join('::'); a  }.reverse.map { |x| double(x) } }
+      let(:object) { double('object') }
+      
+      before(:each) do
+        # allow(AppConfigFor).to receive(:progenitors_of).with(namespaces.first, nil, false).and_return(namespaces[1..-1])
+        ([nil] + namespaces).each_cons(2).to_a.map(&:reverse).each do |param, result|
+          allow(AppConfigFor).to receive(:progenitor_of).with(param, nil).and_return(result)
+        end
+        allow(AppConfigFor).to receive(:progenitor_of).with(object, :namespace).and_return(namespaces.first)
+      end
+
       it 'is an empty array if style is :none' do
-        object = double
-        expect(AppConfigFor.progenitors_of(object, :none)).to eq([])
+        expect(AppConfigFor.progenitors_of(double, :none)).to eq([])
       end
 
       it 'is an empty array if the object is nil' do
         expect(AppConfigFor.progenitors_of(nil, :none)).to eq([])
       end
-
-      it 'uses progenitor with the style :namespace if called with the style :namespace' do
-        expect(AppConfigFor).to receive()
-        AppConfigFor.progenitors_of(object, :namespace)
-      end
-
+      
       it 'verifies the style given' do
         style = :foo
         object = double
@@ -320,11 +349,79 @@ RSpec.describe AppConfigFor do
         AppConfigFor.progenitors_of(object, style)
       end
 
+      it 'requests the progenitor of the object given with the requested inheritance style' do
+        style = :namespace
+        object = double
+        expect(AppConfigFor).to receive(:progenitor_of).with(object, style)
+        AppConfigFor.progenitors_of(object, style)
+      end
 
+      it 'uses a default style of :namespace if none is given' do
+        object = double
+        expect(AppConfigFor).to receive(:progenitor_of).with(object, :namespace)
+        AppConfigFor.progenitors_of(object)
+      end
+
+
+      it 'needs tests' do
+        # Test all styles
+        expect(true).to be_falsey
+      end
+
+
+
+      it 'defaults to unique = true' do
+        # progenitors = (1..5).map { |i| double("p#{i}") }
+        object = double
+        # allow(AppConfigFor).to receive(:progenitor_of).with(object, :namespace).and_return(namespaces.first)
+        # allow(AppConfigFor).to receive(:progenitors_of).with(namespaces.first, nil, false).and_return(namespaces[1..-1])
+        # allow(AppConfigFor).to receive(:progenitors_of).with(object, :namespace).and_call_original
+        # zzz
+        x = AppConfigFor.progenitors_of(object, :namespace)
+        expect(x).to eq(namespaces + [AppConfigFor])
+      end
+      
     end
 
+    describe  '.remove_env_prefix'  do
+
+      it 'needs tests' do
+        expect(true).to be_falsey
+      end
+
+    end
+    
     describe '.verified_style!' do
       
+      let(:last_style) { AppConfigFor::EnvInheritanceStyles.last }
+
+      context 'style given is nil' do
+
+        it 'attempts to retrieve the inheritance style from the object' do
+          style = last_style
+          object = double
+          expect(object).to receive(:env_inheritance).and_return(style)
+          expect(AppConfigFor.verified_style!(nil, object)).to eql(style)
+        end
+
+        it 'uses :namespace as the default style if not provided by the object' do
+          expect(AppConfigFor.verified_style!(nil, double)).to eql(:namespace)
+        end
+        
+      end
+
+      it 'tries to convert the style directly to a symbol' do
+        style = double
+        expect(style).to receive(:to_sym).and_return(last_style)
+        expect(AppConfigFor.verified_style!(style)).to eq(last_style)
+      end
+
+      it 'tries to convert the style a string if it cannot convert directly to a symbol' do
+        style = double
+        expect(style).to receive(:to_s).and_return(last_style.to_s)
+        expect(AppConfigFor.verified_style!(style)).to eq(last_style)
+      end
+
       context 'when given a bad style' do
   
         it 'raises InvalidEnvInheritanceStyle' do
